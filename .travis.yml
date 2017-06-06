@@ -42,8 +42,8 @@ script:
   - yarn compile-devtools
 before_cache:
   # the `yarn compile-devtools` task adds these to node_modules, which slows down caching
-  - rm -rf ./lighthouse-core/node_modules/temp-devtoolsfrontend/
-  - rm -rf ./lighthouse-core/node_modules/temp-devtoolsprotocol/
+  - rm -rf ./node_modules/temp-devtoolsfrontend/
+  - rm -rf ./node_modules/temp-devtoolsprotocol/
 after_success:
   - yarn coveralls
 after_failure:
