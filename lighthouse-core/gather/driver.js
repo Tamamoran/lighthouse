@@ -533,6 +533,7 @@ class Driver {
     const waitForLoadEvent = this._waitForLoadEvent(pauseAfterLoadMs);
     // Network listener. Resolves when the network has been idle for networkQuietThresholdMs.
     const waitForNetworkIdle = this._waitForNetworkIdle(networkQuietThresholdMs);
+    // CPU listener. Resolves when the CPU has been idle for cpuQuietThresholdMs after network idle.
     const waitForCPUIdle = this._waitForCPUIdle(cpuQuietThresholdMs);
 
     // Wait for both load promises. Resolves on cleanup function the clears load
