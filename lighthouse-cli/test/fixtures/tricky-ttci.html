@@ -1,9 +1,12 @@
 <html>
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <body>
-  Just try and figure out my TTCI
+  Just try and figure out my TTCI (hint: it should be ~7s)
 
   <script>
+    /**
+     * Stalls the main thread for timeInMs
+     */
     function stall(timeInMs) {
       const start = performance.now();
       while (performance.now() - start < timeInMs) {
@@ -11,9 +14,9 @@
       }
     }
 
-    setTimeout(() => stall(250), 1000);
-    setTimeout(() => stall(500), 2000);
-    setTimeout(() => stall(2000), 5000);
+    setTimeout(() => stall(250), 1000); // stall for 250ms, 1 second out
+    setTimeout(() => stall(500), 2000); // stall for 500ms, 2 seconds out
+    setTimeout(() => stall(2000), 5000); // stall for 2000ms, 5 seconds out
   </script>
   <script src="bogus.js?delay=2000"></script>
 </body>
