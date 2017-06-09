@@ -49,13 +49,32 @@ driver.sendCommand('Security.enable');
 }
 ```
 
-### Trace of Tab
+### Trace-of-Tab
 
-Trace of tab identifies trace events for key moments (navigation start, first meaningful paint, DOM content loaded, trace end, etc) and provides filtered views of just the main process and the main thread events. Because the timestamps are not interesting in isolation, trace of tab also calculates the times in milliseconds of key moments relative to navigation start, thus providing the typical interpretation of first meaningful paint in ms.
+Trace-of-tab identifies trace events for key moments (navigation start, first meaningful paint, DOM content loaded, trace end, etc) and provides filtered views of just the main process and the main thread events. Because the timestamps are not necessarily interesting in isolation, trace-of-tab also calculates the times in milliseconds of key moments relative to navigation start, thus providing the typical interpretation of first meaningful paint in ms.
+
+```js
+{
+  processEvents: [/* all trace events in the main process */],
+  mainThreadEvents: [/* all trace events on the main thread */],
+  timings: {
+    navigationStart: 0,
+    firstPaint: 150, // firstPaint time in ms after nav start
+    /* other key moments */
+    traceEnd: 16420, // traceEnd time in ms after nav start
+  },
+  timestamps: {
+    navigationStart: 623000000, // navigationStart timestamp in microseconds
+    firstPaint: 623150000, // firstPaint timestamp in microseconds
+    /* other key moments */
+    traceEnd: 639420000, // traceEnd timestamp in microseconds
+  },
+}
+```
 
 ### Tracing Processor
 
-Tracing processor takes the output of trace of tab and identifies the toplevel main thread tasks, their durations, and corresponding impact on page responsiveness. Tracing process also translates task timestamps to milliseconds since navigation start for easier interpretation in computed gatherers and audits.
+Tracing processor takes the output of trace of tab and identifies the top-level main thread tasks, their durations, and corresponding impact on page responsiveness. Tracing processor also translates task timestamps to milliseconds since navigation start for easier interpretation in computed gatherers and audits.
 
 ## Audits
 
