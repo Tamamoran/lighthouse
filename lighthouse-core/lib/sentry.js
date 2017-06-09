@@ -4,7 +4,7 @@ const log = require('./log');
 const SENTRY_URL = 'https://a6bb0da87ee048cc9ae2a345fc09ab2e:63a7029f46f74265981b7e005e0f69f8@sentry.io/174697';
 
 // Fix the polyfill. See https://github.com/GoogleChrome/lighthouse/issues/73
-self.setImmediate = function (...args) {
+self.setImmediate = function(...args) {
   const callback = args[0];
   Promise.resolve().then(() => callback(...args));
   return 0;
@@ -43,10 +43,13 @@ sentryDelegate.init = function init(useSentry, config) {
       sentryDelegate.captureException = (...args) => {
         if (args[0] && args[0].expected) return;
         Sentry.captureException(...args);
-      }
+      };
     });
   } catch (e) {
-    log.warn('sentry', 'Could not load raven library, errors will not be reported.');
+    log.warn(
+      'sentry',
+      'Could not load raven library, errors will not be reported.'
+    );
   }
 };
 
