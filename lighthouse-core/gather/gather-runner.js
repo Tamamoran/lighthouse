@@ -227,7 +227,7 @@ class GatherRunner {
       return chain.then(_ => {
         const artifactPromise = Promise.resolve().then(_ => gatherer.pass(options));
         gathererResults[gatherer.name].push(artifactPromise);
-        return GatherRunner.recoverOrThrow(artifactPromise);
+        return GatherRunner.recoverOrThrow(artifactPromise, gatherer.name);
       });
     }, pass);
   }
@@ -284,7 +284,7 @@ class GatherRunner {
         log.log('status', status);
         const artifactPromise = Promise.resolve().then(_ => gatherer.afterPass(options, passData));
         gathererResults[gatherer.name].push(artifactPromise);
-        return GatherRunner.recoverOrThrow(artifactPromise);
+        return GatherRunner.recoverOrThrow(artifactPromise, gatherer.name);
       }).then(_ => {
         log.verbose('statusEnd', status);
       });
