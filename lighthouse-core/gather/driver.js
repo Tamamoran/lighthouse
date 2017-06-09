@@ -18,8 +18,8 @@ const DevtoolsLog = require('./devtools-log');
 const DEFAULT_PAUSE_AFTER_LOAD = 0;
 // Controls how long to wait between network requests before determining the network is quiet
 const DEFAULT_NETWORK_QUIET_THRESHOLD = 5000;
-// Controls how long to wait after network quiet before continuing
-const DEFAULT_PAUSE_AFTER_NETWORK_QUIET = 0;
+// Controls how long to wait between longtasks before determining the CPU is idle, off by default
+const DEFAULT_CPU_QUIET_THRESHOLD = 0;
 
 const _uniq = arr => Array.from(new Set(arr));
 
@@ -425,6 +425,66 @@ class Driver {
   }
 
   /**
+   * Installs a PerformanceObserver in the page to monitor for longtasks and resolves when there have
+   * been no long tasks for at least waitForCPUQuiet ms. The promise will not resolve until the
+   * `markAsResolvable` function on the return object has been called. This is to prevent promise resolution
+   * before some important point in time such as network quiet or document load.
+   * @param {number} waitForCPUQuiet
+   * @return {{promise: !Promise, cancel: function(), markAsResolvable: function()}}
+   */
+  _waitForCPUIdle(waitForCPUQuiet) {
+    if (!waitForCPUQuiet) {
+      return {
+        markAsResolvable: () => undefined,
+        promise: Promise.resolve(),
+        cancel: () => undefined,
+      };
+    }
+
+    let lastTimeout;
+    let isResolvable = false;
+    function checkForQuiet(driver, resolve) {
+      const tryLater = () => {
+        lastTimeout = setTimeout(() => checkForQuiet(driver, resolve), 1000);
+      };
+
+      if (!isResolvable) {
+        return tryLater();
+      }
+
+      return driver.evaluateAsync(`(${checkTimeSinceLastLongTask.toString()})()`)
+        .then(timeSinceLongTask => {
+          if (typeof timeSinceLongTask === 'number' && timeSinceLongTask >= waitForCPUQuiet) {
+            log.verbose('Driver', `CPU has been idle for ${timeSinceLongTask} ms`);
+            resolve();
+          } else {
+            log.verbose('Driver', `CPU has been idle for ${timeSinceLongTask} ms`);
+            tryLater();
+          }
+        });
+    }
+
+    log.verbose('Driver', `Installing longtask listener for CPU idle.`);
+    this.evaluateScriptOnLoad(`(${installPerformanceObserver.toString()})()`);
+    let cancel;
+    const promise = new Promise((resolve, reject) => {
+      checkForQuiet(this, resolve);
+      cancel = () => {
+        if (lastTimeout) clearTimeout(lastTimeout);
+        reject(new Error('Wait for CPU idle cancelled'));
+      };
+    });
+
+    return {
+      markAsResolvable: () => {
+        isResolvable = true;
+      },
+      promise,
+      cancel,
+    };
+  }
+
+  /**
    * Return a promise that resolves `pauseAfterLoadMs` after the load event
    * fires and a method to cancel internal listeners and timeout.
    * @param {number} pauseAfterLoadMs
@@ -460,27 +520,27 @@ class Driver {
    * See https://github.com/GoogleChrome/lighthouse/issues/627 for more.
    * @param {number} pauseAfterLoadMs
    * @param {number} networkQuietThresholdMs
-   * @param {number} pauseAfterNetworkQuietMs
+   * @param {number} cpuQuietThresholdMs
    * @param {number} maxWaitForLoadedMs
    * @return {!Promise}
    * @private
    */
-  _waitForFullyLoaded(pauseAfterLoadMs, networkQuietThresholdMs, pauseAfterNetworkQuietMs,
+  _waitForFullyLoaded(pauseAfterLoadMs, networkQuietThresholdMs, cpuQuietThresholdMs,
       maxWaitForLoadedMs) {
     let maxTimeoutHandle;
 
     // Listener for onload. Resolves pauseAfterLoadMs ms after load.
     const waitForLoadEvent = this._waitForLoadEvent(pauseAfterLoadMs);
-    // Network listener. Resolves pauseAfterNetworkQuietMs after when the network has been idle for
-    // networkQuietThresholdMs.
-    const waitForNetworkIdle = this._waitForNetworkIdle(networkQuietThresholdMs,
-        pauseAfterNetworkQuietMs);
+    // Network listener. Resolves when the network has been idle for networkQuietThresholdMs.
+    const waitForNetworkIdle = this._waitForNetworkIdle(networkQuietThresholdMs);
+    const waitForCPUIdle = this._waitForCPUIdle(cpuQuietThresholdMs);
 
     // Wait for both load promises. Resolves on cleanup function the clears load
     // timeout timer.
     const loadPromise = Promise.all([
       waitForLoadEvent.promise,
-      waitForNetworkIdle.promise
+      waitForNetworkIdle.promise.then(waitForCPUIdle.markAsResolvable),
+      waitForCPUIdle.promise,
     ]).then(() => {
       return function() {
         log.verbose('Driver', 'loadEventFired and network considered idle');
@@ -497,6 +557,7 @@ class Driver {
         log.warn('Driver', 'Timed out waiting for page load. Moving on...');
         waitForLoadEvent.cancel();
         waitForNetworkIdle.cancel();
+        waitForCPUIdle.cancel();
       };
     });
 
@@ -564,13 +625,13 @@ class Driver {
 
     let pauseAfterLoadMs = options.config && options.config.pauseAfterLoadMs;
     let networkQuietThresholdMs = options.config && options.config.networkQuietThresholdMs;
-    let pauseAfterNetworkQuietMs = options.config && options.config.pauseAfterNetworkQuietMs;
+    let cpuQuietThresholdMs = options.config && options.config.cpuQuietThresholdMs;
     let maxWaitMs = options.flags && options.flags.maxWaitForLoad;
 
     /* eslint-disable max-len */
     if (typeof pauseAfterLoadMs !== 'number') pauseAfterLoadMs = DEFAULT_PAUSE_AFTER_LOAD;
     if (typeof networkQuietThresholdMs !== 'number') networkQuietThresholdMs = DEFAULT_NETWORK_QUIET_THRESHOLD;
-    if (typeof pauseAfterNetworkQuietMs !== 'number') pauseAfterNetworkQuietMs = DEFAULT_PAUSE_AFTER_NETWORK_QUIET;
+    if (typeof cpuQuietThresholdMs !== 'number') cpuQuietThresholdMs = DEFAULT_CPU_QUIET_THRESHOLD;
     if (typeof maxWaitMs !== 'number') maxWaitMs = Driver.MAX_WAIT_FOR_FULLY_LOADED;
     /* eslint-enable max-len */
 
@@ -579,7 +640,7 @@ class Driver {
       .then(_ => this.sendCommand('Emulation.setScriptExecutionDisabled', {value: disableJS}))
       .then(_ => this.sendCommand('Page.navigate', {url}))
       .then(_ => waitForLoad && this._waitForFullyLoaded(pauseAfterLoadMs,
-          networkQuietThresholdMs, pauseAfterNetworkQuietMs, maxWaitMs))
+          networkQuietThresholdMs, cpuQuietThresholdMs, maxWaitMs))
       .then(_ => this._endNetworkStatusMonitoring());
   }
 
@@ -1009,6 +1070,34 @@ function wrapRuntimeEvalErrorInBrowser(err) {
     message: err.message || fallbackMessage,
     stack: err.stack || (new Error()).stack,
   };
+}
+
+/**
+ * Used by _waitForCPUIdle and executed in the context of the page, updates the ____lastLongTask
+ * property on window to the end time of the last long task.
+ * instanbul ignore next
+ */
+function installPerformanceObserver() {
+  window.____lastLongTask = window.performance.now();
+  const observer = new window.PerformanceObserver(entryList => {
+    const entries = entryList.getEntries();
+    for (const entry of entries) {
+      if (entry.entryType === 'longtask') {
+        const taskEnd = entry.startTime + entry.duration;
+        window.____lastLongTask = Math.max(window.____lastLongTask, taskEnd);
+      }
+    }
+  });
+  observer.observe({entryTypes: ['longtask']});
+}
+
+
+/**
+ * Used by _waitForCPUIdle and executed in the context of the page, returns time since last long task.
+ * instanbul ignore next
+ */
+function checkTimeSinceLastLongTask() {
+  return window.performance.now() - window.____lastLongTask;
 }
 
 module.exports = Driver;

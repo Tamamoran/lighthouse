@@ -1,0 +1,20 @@
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<body>
+  Just try and figure out my TTCI
+
+  <script>
+    function stall(timeInMs) {
+      const start = performance.now();
+      while (performance.now() - start < timeInMs) {
+        for (let i = 0; i < 1000000; i++) ;
+      }
+    }
+
+    setTimeout(() => stall(250), 1000);
+    setTimeout(() => stall(500), 2000);
+    setTimeout(() => stall(2000), 5000);
+  </script>
+  <script src="bogus.js?delay=2000"></script>
+</body>
+</html>
