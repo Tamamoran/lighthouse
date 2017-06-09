@@ -30,6 +30,7 @@
 
 const ComputedArtifact = require('./computed-artifact');
 const log = require('../../lib/log');
+const Sentry = require('../../lib/sentry');
 
 class TraceOfTab extends ComputedArtifact {
   get name() {
@@ -79,6 +80,8 @@ class TraceOfTab extends ComputedArtifact {
     // In this case, we'll use the last firstMeaningfulPaintCandidate we can find.
     // However, if no candidates were found (a bogus trace, likely), we fail.
     if (!firstMeaningfulPaint) {
+      Sentry.captureMessage('No firstMeaningfulPaint found, using fallback');
+
       const fmpCand = 'firstMeaningfulPaintCandidate';
       log.verbose('trace-of-tab', `No firstMeaningfulPaint found, falling back to last ${fmpCand}`);
       const lastCandidate = frameEvents.filter(e => e.name === fmpCand).pop();

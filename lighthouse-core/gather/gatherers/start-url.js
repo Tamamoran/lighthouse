@@ -18,7 +18,7 @@
 
 const Gatherer = require('./gatherer');
 const URL = require('../../lib/url-shim');
-const ExpectedError = require('../../lib/expected-error');
+const createExpectedError = require('../../lib/expected-error');
 const manifestParser = require('../../lib/manifest-parser');
 
 class StartUrl extends Gatherer {
@@ -66,7 +66,7 @@ class StartUrl extends Gatherer {
       .then(manifest => {
         if (!manifest.value.start_url || !manifest.value.start_url.raw) {
           const error = new Error(`No web app manifest found on page ${options.url}`);
-          return Promise.reject(ExpectedError(error));
+          return Promise.reject(createExpectedError(error));
         }
 
         if (manifest.value.start_url.debugString) {
@@ -79,7 +79,8 @@ class StartUrl extends Gatherer {
 
   afterPass(options, tracingData) {
     if (!this.startUrl) {
-      return Promise.reject(ExpectedError(new Error('No start_url found inside the manifest')));
+      const error = new Error('No start_url found inside the manifest');
+      return Promise.reject(createExpectedError(error));
     }
 
     const networkRecords = tracingData.networkRecords;

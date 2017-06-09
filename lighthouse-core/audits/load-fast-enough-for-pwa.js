@@ -123,17 +123,24 @@ class LoadFastEnough4Pwa extends Audit {
         }
 
         if (!areLatenciesAll3G) {
-          // eslint-disable-next-line max-len
-          const debugString = `First Interactive was found at ${timeToFirstInteractive.toLocaleString()}, however, the network request latencies were not sufficiently realistic, so the performance measurements cannot be trusted.`;
+          const sentryContext = Sentry.getContext();
+          const hadThrottlingEnabled = sentryContext && sentryContext.extra &&
+              sentryContext.extra.networkThrottling;
 
-          Sentry.captureMessage('Network request latencies were not realistic', {
-            tags: {audit: this.meta.name},
-            level: 'warning',
-          });
+          if (hadThrottlingEnabled) {
+            const violatingLatency = firstRequestLatencies
+                .find(item => Number(item.latency) < latency3gMin);
+            Sentry.captureMessage('Network request latencies were not realistic', {
+              tags: {audit: this.meta.name},
+              extra: {violatingLatency},
+              level: 'warning',
+            });
+          }
 
           return {
             rawValue: true,
-            debugString,
+            // eslint-disable-next-line max-len
+            debugString: `First Interactive was found at ${timeToFirstInteractive.toLocaleString()}, however, the network request latencies were not sufficiently realistic, so the performance measurements cannot be trusted.`,
             extendedInfo,
             details
           };

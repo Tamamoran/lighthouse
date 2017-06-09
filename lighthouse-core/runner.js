@@ -33,8 +33,9 @@ class Runner {
     opts.flags = opts.flags || {};
 
     const config = opts.config;
+    const environmentData = opts.environmentData || {};
 
-    Sentry.init(opts.flags.disableErrorReporting === false, opts.environmentData || {});
+    Sentry.init(opts.flags.enableErrorReporting, environmentData);
 
     // save the initialUrl provided by the user
     opts.initialUrl = opts.url;
@@ -50,15 +51,17 @@ class Runner {
       return Promise.reject(err);
     }
 
+    const sentryContext = {
+      url: opts.url,
+      deviceEmulation: !opts.flags.disableDeviceEmulation,
+      networkThrottling: !opts.flags.disableNetworkThrottling,
+      cpuThrottling: !opts.flags.disableCpuThrottling,
+    };
+    Sentry.mergeContext({extra: Object.assign({}, environmentData.extra, sentryContext)});
     Sentry.captureBreadcrumb({
       message: 'Run started',
       category: 'lifecycle',
-      data: {
-        url: opts.url,
-        deviceEmulation: !opts.flags.disableDeviceEmulation,
-        networkThrottling: !opts.flags.disableNetworkThrottling,
-        cpuThrottling: !opts.flags.disableCpuThrottling,
-      },
+      data: sentryContext,
     });
 
     // If the URL isn't https and is also not localhost complain to the user.

@@ -152,8 +152,8 @@ function saveResults(results: Results, artifacts: Object, flags: Flags) {
         return innerPromise.then((_: Results) => Printer.write(results, outputType, outputPath));
       }, Promise.resolve(results));
     } else {
-      const outputPath =
-          flags.outputPath || `${resolvedPath}.report.${typeToExtension(flags.output)}`;
+      const outputPath = flags.outputPath ||
+          `${resolvedPath}.report.${typeToExtension(flags.output)}`;
       return Printer.write(results, flags.output, outputPath).then(results => {
         if (flags.output === Printer.OutputMode[Printer.OutputMode.html] ||
             flags.output === Printer.OutputMode[Printer.OutputMode.domhtml]) {
@@ -176,21 +176,21 @@ export async function runLighthouse(
     url: string, flags: Flags, config: Object|null): Promise<{}|void> {
   let launchedChrome: LaunchedChrome|undefined;
 
-  if (typeof flags.disableErrorReporting === 'undefined') {
+  if (flags.enableErrorReporting) {
     const isErrorReportingEnabled = await askPermission();
-    flags.disableErrorReporting = !isErrorReportingEnabled;
+    flags.enableErrorReporting = isErrorReportingEnabled;
   }
 
   try {
     launchedChrome = await getDebuggableChrome(flags);
     flags.port = launchedChrome.port;
     const results = await lighthouse(url, flags, config, {
+      name: 'redacted', // prevent sentry from using hostname
       environment: isDev() ? 'development' : 'production',
-      serverName: 'redacted',
       release: pkg.version,
       tags: {
         channel: 'cli',
-      }
+      },
     });
 
     const artifacts = results.artifacts;
