@@ -97,7 +97,7 @@ echo "Upload the package zip to CWS dev dashboard"
 
 echo "Verify the npm package won't include unncessary files"
 yarn global add irish-pub pkgfiles
-irish-pub; pkgfiles;  
+irish-pub; pkgfiles;
 
 echo "ship it"
 npm publish
@@ -108,6 +108,15 @@ echo "Generate the release notes, and update the release page"
 
 # * Tell the world!!! *
 echo "Inform various peoples"
+```
+
+### Releasing chrome launcher.
+
+```sh
+cd chrome-launcher
+echo "edit package.json bumping the version (major|minor|patch)"
+echo "commit the change as a version bump"
+npm publish
 ```
 
 ### Canary release
